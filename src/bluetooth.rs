@@ -23,8 +23,8 @@ use result::{Result, BlueError};
 use btleplug::api::{Central as _, Characteristic, Manager as _, Peripheral as _, PeripheralProperties, ScanFilter, ValueNotification, WriteType};
 use btleplug::platform::{Adapter, Manager, Peripheral, PeripheralId};
 use std::{time::Duration, fmt::Display};
+use iced::futures::StreamExt;
 use tokio::time;
-use futures::StreamExt;
 use uuid::Uuid;
 
 const SERVICE_UUID: Uuid = uuid::uuid!("0000FFE0-0000-1000-8000-00805F9B34FB");
@@ -45,6 +45,7 @@ async fn get_adapter(manager: Manager) -> Result<Adapter> {
 /// It is the entry point for communication with the different devices that the app needs.
 /// 
 /// pd: For now I only deployed one device (Xplorer)
+#[derive(Debug, Clone)]
 pub struct Central {
     adapter: Adapter,
     filter: Uuid,
@@ -97,6 +98,7 @@ impl Central {
 /// A wrapper for the peripheral device, handles all Bluetooth communication with the explorer
 /// 
 /// Important: the explorer uses an HM-10 BLE 4
+#[derive(Debug, Clone)]
 pub struct Xplorer {
     pub id: PeripheralId,
     peripheral: Peripheral,
@@ -137,7 +139,7 @@ impl Xplorer {
         Ok(characteristic)
     }
 
-    async fn subscribe(&self) -> Result<()> {
+    pub async fn subscribe(&self) -> Result<()> {
         let characteristic = self.charactacteristic()?;
         Ok(self.peripheral
             .subscribe(&characteristic)
@@ -148,7 +150,7 @@ impl Xplorer {
     pub async fn connect(&self) -> Result<()> {
         self.peripheral.connect().await?;
         self.peripheral.discover_services().await?;
-        self.subscribe().await?;
+        // self.subscribe().await?;
 
         Ok(())
     }
