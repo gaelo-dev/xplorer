@@ -4,9 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-btleplug = "0.11.6"
-tokio = { version = "1.40.0", features = ["full"] }
+btleplug = { version = "0.11.6", features = ["serde"] }
+tokio = { version = "1.41.0", features = ["full"] }
 # futures = "0.3.31"
-thiserror = "1.0.64"
-uuid = "1.10.0"
+thiserror = "1.0.65"
+uuid = "1.11.0"
 iced = { version = "0.13.1", features = ["tokio"] }
+confy = "0.6.1"
+serde = "1.0.213"
