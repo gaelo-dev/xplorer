@@ -1,34 +1,16 @@
-use crate::bluetooth;
+use crate::{bluetooth::{self, ConnectionState}, config::Config};
 use iced::{
     widget::{button, column, row, text, text_input}, 
     Element, Task
 };
 
-async fn connect(peripheral_name: String) -> State {
-    let central = bluetooth::Central::new().await.unwrap();
-    let peripherals_properties = central.scan().await.unwrap();
-
-    for (id, properties) in peripherals_properties {
-        let name = properties.local_name.unwrap_or("(peripheral name unknown)".to_string());
-        println!("Peripheral: {name} ({})({})", properties.address, id);
-
-        if name.contains(&peripheral_name) {
-            let xplorer = central.connect(&id).await.unwrap();
-            return State::Connected { central, xplorer }
-            // xplorer.send("on13").await?;
-        }
-    }
-
-    State::NotFoundPeripheral(central)
-}
-
 pub struct App {
-    // central: Option<bluetooth::Central>,
-    // xplorer: Option<bluetooth::Xplorer>,
     msg: String,
-    state: State,
+    cfg: Config,
+    state: ConnectionState,
 }
 
+/* 
 #[derive(Debug, Clone)]
 pub enum State {
     Disconnected,
@@ -39,12 +21,13 @@ pub enum State {
         xplorer: bluetooth::Xplorer,
     }
 }
+*/
 
 #[derive(Debug, Clone)]
 pub enum Message {
     InputChanged(String),
-    Connect,
-    StateChanged(State),
+    Connect(bluetooth::BDAddr),
+    StateChanged(ConnectionState),
     Ok,
     Send,
     On,
@@ -52,18 +35,13 @@ pub enum Message {
 }
 
 impl App {
-    pub fn new() -> (Self, Task<Message>) {
-        (
-            Self {
-                // central: None,
-                msg: String::new(),
-                state: State::Disconnected,
-            },
-            Task::none()
-            // Task::perform(bluetooth::Central::new(), |central| Message::Central(central.unwrap()))
-        )
+    pub fn new(cfg: Config) -> Self {
+        Self {
+            cfg,
+            msg: String::new(),
+            state: ConnectionState::Loading,
+        }
     }
-
 
     pub fn update(&mut self, msg: Message) -> Task<Message> {
         match msg {
@@ -71,18 +49,18 @@ impl App {
                 self.msg = s;
                 Task::none()
             },
-            Message::Connect => {
-                let msg = self.msg.clone();
-                self.msg.clear();
+            Message::Connect(ip) => {
+                let state = self.state.clone();
+                self.state = ConnectionState::Loading;
 
-                Task::perform(connect(msg), Message::StateChanged)
+                Task::perform(state.reconnect(ip), |state| Message::StateChanged(state.unwrap()))
             },
             Message::StateChanged(state) => {
                 self.state = state;
                 Task::none()
             }
             Message::Send => {
-                if let State::Connected { xplorer, .. } = &self.state{
+                if let ConnectionState::Connected { xplorer, .. } = &self.state{
                     let msg = self.msg.clone();
                     let xplorer = xplorer.clone();
                     self.msg.clear();
@@ -109,19 +87,18 @@ impl App {
 
     pub fn view(&self) -> Element<Message> {
         match &self.state {
-            State::Disconnected => {
-                column![
-                    text_input("Peripheral name", &self.msg)
-                        .on_input(Message::InputChanged)
-                        .on_submit(Message::Connect),
-                    button("Connect")
-                        .on_press(Message::Connect)
-                ].into()
+            ConnectionState::Loading => text("...").into(),
+            ConnectionState::Disconnected { peripherals, .. } => {
+                iced::widget::column(peripherals.into_iter().map(|(_id, peripheral)| {
+                    let name = peripheral.local_name.as_deref().unwrap_or("(peripheral name unknown)");
+                    row![
+                        text(format!("{name} ({})", peripheral.address)),
+                        button("Connect")
+                            .on_press(Message::Connect(peripheral.address))
+                    ].into()
+                })).into()
             }
-            State::NotFoundPeripheral(_) => {
-                text("No se encontro el dispositivo").into()
-            },
-            State::Connected { central: _, xplorer: _ } => {
+            ConnectionState::Connected { central: _, xplorer: _ } => {
                 column![
                     row![
                         text_input("Message", &self.msg)
