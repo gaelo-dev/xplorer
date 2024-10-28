@@ -1,6 +1,15 @@
 // probablemente cambie esto
 use std::fmt::Display;
 use regex::Regex;
+use std::sync::LazyLock;
+
+static REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?x)
+        (?P<action>[A-z])
+        =?
+        (?P<value>\d*)
+    ").unwrap()
+}); 
 
 #[derive(Debug)]
 pub struct Command<T: Action> {
@@ -66,13 +75,7 @@ pub trait Action: Display {
     fn from_string(value: String) -> Self
     where Self: Sized
     {
-        let re = Regex::new(r"(?x)
-            (?P<action>[A-z])
-            =?
-            (?P<value>\d*)
-        ").unwrap();
-
-        let caps = re.captures(&value).unwrap();
+        let caps = REGEX.captures(&value).unwrap();
         let value = caps.name("value")
             .map_or("", |m| m.as_str())
             .parse::<u8>().unwrap_or(0);
