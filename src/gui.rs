@@ -10,19 +10,6 @@ pub struct App {
     state: ConnectionState,
 }
 
-/* 
-#[derive(Debug, Clone)]
-pub enum State {
-    Disconnected,
-    NotFoundPeripheral(bluetooth::Central),
-    // Connected(bluetooth::Xplorer),
-    Connected {
-        central: bluetooth::Central,
-        xplorer: bluetooth::Xplorer,
-    }
-}
-*/
-
 #[derive(Debug, Clone)]
 pub enum Message {
     InputChanged(String),
@@ -52,6 +39,7 @@ impl App {
             Message::Connect(ip) => {
                 let state = self.state.clone();
                 self.state = ConnectionState::Loading;
+                self.cfg.addr = Some(ip);
 
                 Task::perform(state.reconnect(ip), |state| Message::StateChanged(state.unwrap()))
             },
