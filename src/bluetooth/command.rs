@@ -1,88 +1,58 @@
 // probablemente cambie esto
-use std::fmt::Display;
-use regex::Regex;
-use std::sync::LazyLock;
+// use std::fmt::Display;
 
-static REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?x)
-        (?P<action>[A-z])
-        =?
-        (?P<value>\d*)
-    ").unwrap()
-}); 
-
-#[derive(Debug)]
-pub struct Command<T: Action> {
-    actions: Vec<T>
+pub struct Command {
+    actions: Vec<u8>,
 }
 
-impl<T: Action> Command<T> {
-    pub fn new() -> Self {
-        Self { actions: Vec::new() }
-    }
-
-    pub fn with_vec(actions: Vec<T>) -> Self {
-        Self { actions }
-    }
-
-    pub fn from(s: String) -> Self {
-        s.into()
-    }
-
-    pub fn add_action(&mut self, action: T) {
-        self.actions.push(action);
-    }
-}
-
-impl<T: Action> Display for Command<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", T::command_name())?;
-        
-        for action in &self.actions {
-            write!(f, "+{}", action)?;
+impl Command {
+    pub fn new<T: Action>() -> Self {
+        Self { 
+            actions: vec![T::command()]
         }
-
-        write!(f, ";")
     }
-}
 
-impl<T: Action> From<String> for Command<T> {
-    fn from(value: String) -> Self {
-        let mut actions = Vec::new();
-        
-        let mut iter = value.split(&['+', ';']);
-        let _ = iter.next().unwrap();
+    pub fn with_vec<T: Action>(actions: Vec<T>) -> Self {
+        let mut vec = vec![T::command()];
+        vec.append(&mut actions.into_iter().map(|a| a.as_byte()).collect());
 
-        for s in iter {
-            if s.is_empty() {
-                continue;
-            }
-
-            actions.push(T::from_string(s.to_string()));
+        Self { 
+            actions: vec
         }
-        
-        Self { actions }
+    }
+
+    pub fn add_action<T: Action>(&mut self, action: T) {
+        self.actions.push(action.as_byte());
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.actions
     }
 }
 
-pub trait Action: Display {
-    fn command_name() -> &'static str
+pub trait Action {
+    fn command() -> u8
     where Self: Sized;
 
-    fn from_str(s: &str) -> impl Fn(u8) -> Self
-    where Self: Sized;
-    
-    fn from_string(value: String) -> Self
-    where Self: Sized
-    {
-        let caps = REGEX.captures(&value).unwrap();
-        let value = caps.name("value")
-            .map_or("", |m| m.as_str())
-            .parse::<u8>().unwrap_or(0);
+    fn action(&self) -> u8;
+    fn value(&self) -> u8;
+
+    fn as_byte(&self) -> u8 {
+        let action = self.action() / 2;
+        let val = ((self.value() as u16 * 15 + 50) / 180) as u8;
+
+        println!("action: {action}\nvalue:{val}");
         
-        let s = Self::from_str(&caps["action"])(value);
-        s
+        (action << 4) | val
     }
+
+    /*
+    let extract_command = message >> 4;
+    let extract_velocity = message & 0b0000_1111;
+
+
+    let real_velocity = (extract_velocity as u32 * 100 + 4) / 15;
+    */
 }
 
 #[derive(Debug)]
@@ -93,29 +63,26 @@ pub enum Servo {
     Grip(u8),
 }
 
-impl Display for Servo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Action for Servo {
+    fn command() -> u8 {
+        1 << 0
+    }
+
+    fn action(&self) -> u8 {
         match self {
-            Self::Base(degrees) => write!(f, "B={degrees}"),
-            Self::Elbow(degrees) => write!(f, "E={degrees}"),
-            Self::Armrest(degrees) => write!(f, "A={degrees}"),
-            Self::Grip(degrees) => write!(f, "G={degrees}"),
+            Self::Base(_) => 1 << 0,
+            Self::Elbow(_) => 1 << 1,
+            Self::Armrest(_) => 1 << 2,
+            Self::Grip(_) => 1 << 3,
         }
     }
-}
 
-impl Action for Servo {
-    fn command_name() -> &'static str {
-        "S"   
-    }
-
-    fn from_str(s: &str) -> impl Fn(u8) -> Self {
-        match s {
-            "B" => Self::Base,
-            "E" => Self::Elbow,
-            "A" => Self::Armrest,
-            "G" => Self::Grip,
-            _ => panic!()
+    fn value(&self) -> u8 {
+        match self {
+            Self::Base(degrees) => *degrees,
+            Self::Elbow(degrees) => *degrees,
+            Self::Armrest(degrees) => *degrees,
+            Self::Grip(degrees) => *degrees,
         }
     }
 }
@@ -129,31 +96,28 @@ pub enum Motor {
     Speed(u8),
 }
 
-impl Display for Motor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Action for Motor {
+    fn command() -> u8 {
+        1 << 1
+    }
+
+    fn action(&self) -> u8 {
         match self {
-            Motor::Forward => write!(f, "F"),
-            Motor::Backward => write!(f, "B"),
-            Motor::Rightward => write!(f, "R"), 
-            Motor::Leftward => write!(f, "L"),
-            Motor::Speed(speed) => write!(f, "S={}", speed),
+            Self::Forward => 1 << 0,
+            Self::Backward => 1 << 1,
+            Self::Rightward => 1 << 2,
+            Self::Leftward => 1 << 3,
+            Self::Speed(_) => 1 << 4,
         }
     }
-}
 
-impl Action for Motor {
-    fn command_name() -> &'static str {
-        "M"
-    }
-
-    fn from_str(s: &str) -> impl Fn(u8) -> Self {
-        match s {
-            "F" => |_| Self::Forward,
-            "B" => |_| Self::Backward,
-            "R" => |_| Self::Rightward,
-            "L" => |_| Self::Leftward,
-            "S" => Self::Speed,
-            _ => panic!()
+    fn value(&self) -> u8 {
+        match self {
+            Self::Forward => 0,
+            Self::Backward => 0,
+            Self::Rightward => 0,
+            Self::Leftward => 0,
+            Self::Speed(s) => *s,
         }
     }
 }
@@ -163,28 +127,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn command_display1() {
-        let mut command = Command::new();
-        command.add_action(Servo::Base(90));
-        command.add_action(Servo::Grip(90));
+    fn as_bytes() {
+       let mut command = Command::new::<Servo>();
+       command.add_action(Servo::Base(45)); 
+       command.add_action(Servo::Grip(45));
 
-        assert_eq!(command.to_string(), "S+B=90+G=90;")
-    }
-
-    #[test]
-    fn command_display2() {
-        let mut command = Command::new();
-        command.add_action(Motor::Speed(100));
-        command.add_action(Motor::Forward);
-
-        assert_eq!(command.to_string(), "M+S=100+F;")
-    }
-
-    #[test]
-    fn from_string_to_command() {
-        //let command: Command<Motor> = "M+S=100+F;".to_string().into();
-        let command: Command<Motor> = Command::from("M+S=100+F;".to_string());
-
-        assert_eq!(command.to_string(), "M+S=100+F;")
+        assert_eq!(command.as_bytes(), &[1 << 0, 0b0000_0111, 0b0100_0111])
     }
 }
