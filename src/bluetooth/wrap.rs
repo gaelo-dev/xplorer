@@ -1,10 +1,10 @@
 /// Wrap the crate btleplug for more comfortable use
-use super::{Result, BlueError};
+use super::{Action, BlueError, Result};
 
 use btleplug::api::{Central as _, Characteristic, Manager as _, Peripheral as _, PeripheralProperties, ScanFilter, ValueNotification, WriteType};
 use btleplug::platform::{Adapter, Manager, Peripheral, PeripheralId};
-use std::{time::Duration, fmt::Display};
-use iced::futures::StreamExt;
+use std::{time::Duration, pin::Pin};
+use iced::futures::Stream;
 use tokio::time;
 use uuid::Uuid;
 
@@ -148,13 +148,13 @@ impl Xplorer {
         todo!()
     }
 
-    /// Send a message/command to the explorer
+    /// Send a message/action to the explorer
     /// 
     /// The HM-10 only has one writable characteristic: [`CHARACTERISTIC_UUID`]
-    pub async fn send<T: Display>(&self, msg: T) -> Result<()> {    
+    pub async fn send<T: Action>(&self, msg: T) -> Result<()> {    
         let characteristic = self.charactacteristic()?;
         Ok(self.peripheral
-            .write(&characteristic, msg.to_string().as_bytes(), WriteType::WithoutResponse)
+            .write(&characteristic, &msg.as_bytes(), WriteType::WithoutResponse)
             .await?)
     }
 
@@ -165,8 +165,7 @@ impl Xplorer {
             .await?)
     }
 
-    pub async fn recv_notifications(&self, lot: usize) -> Result<Vec<ValueNotification>> {
-        let stream = self.peripheral.notifications().await?.take(lot);
-        Ok(stream.collect().await)
+    pub async fn recv_notifications(&self) -> Result<Pin<Box<dyn Stream<Item = ValueNotification> + Send>>> {
+        Ok(self.peripheral.notifications().await?)
     }
 }

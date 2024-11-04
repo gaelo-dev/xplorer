@@ -19,11 +19,11 @@ mod result {
 }
 
 mod wrap;
-mod command;
+mod actions;
 
 use result::{Result, BlueError};
 use wrap::{Central, Peripherals, Xplorer};
-pub use command::{Command, Servo, Motor};
+pub use actions::{Servo, Motor, Action};
 pub use btleplug::api::BDAddr;
 
 /// Represents the connection state of the Bluetooth communication
