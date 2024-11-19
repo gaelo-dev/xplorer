@@ -19,16 +19,17 @@ mod result {
 }
 
 mod wrap;
-mod actions;
+mod command;
 
 use result::{Result, BlueError};
 use wrap::{Central, Peripherals, Xplorer};
-pub use actions::{Servo, Motor, Action};
+pub use command::{Command, ToBytes, car};
 pub use btleplug::api::BDAddr;
 
 /// Represents the connection state of the Bluetooth communication
 #[derive(Debug, Clone)]
 pub enum ConnectionState {
+    /// Represents the loading state, it is only used to create a loading view
     Loading,
     /// Represents the disconnected state and contains a list of peripherals to which it can connect.
     Disconnected {

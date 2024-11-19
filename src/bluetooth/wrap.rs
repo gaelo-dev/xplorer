@@ -1,5 +1,5 @@
 /// Wrap the crate btleplug for more comfortable use
-use super::{Action, BlueError, Result};
+use super::{ToBytes, BlueError, Result};
 
 use btleplug::api::{Central as _, Characteristic, Manager as _, Peripheral as _, PeripheralProperties, ScanFilter, ValueNotification, WriteType};
 use btleplug::platform::{Adapter, Manager, Peripheral, PeripheralId};
@@ -148,13 +148,13 @@ impl Xplorer {
         todo!()
     }
 
-    /// Send a message/action to the explorer
+    /// Send a message/command to the explorer
     /// 
     /// The HM-10 only has one writable characteristic: [`CHARACTERISTIC_UUID`]
-    pub async fn send<T: Action>(&self, msg: T) -> Result<()> {    
+    pub async fn send<T: ToBytes>(&self, msg: T) -> Result<()> { 
         let characteristic = self.charactacteristic()?;
         Ok(self.peripheral
-            .write(&characteristic, &msg.as_bytes(), WriteType::WithoutResponse)
+            .write(&characteristic, &msg.to_bytes(), WriteType::WithoutResponse)
             .await?)
     }
 

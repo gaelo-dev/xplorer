@@ -15,8 +15,8 @@ pub enum Message {
     InputChanged(String),
     Connect(bluetooth::BDAddr),
     StateChanged(ConnectionState),
-    Ok,
     Send,
+    Ok,
     On,
     Off,
 }
