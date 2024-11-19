@@ -79,18 +79,20 @@ macro_rules! create_command {
             
             $(
                 pub fn $action( $($value: u8)? ) -> Command {
-                    #[allow(unused_mut)]
-                    let mut cmd = Command {
+                    $( 
+                        return Command {
+                            cmd: $cmd,
+                            action: $code,
+                            value: Some($value)
+                        };
+                    )?
+
+                    #[allow(unreachable_code)]
+                    Command {
                         cmd: $cmd,
                         action: $code,
                         value: None
-                    };
-
-                    $( 
-                        cmd.value = Some($value);
-                    )?
-
-                    cmd
+                    }
                 }
             )*
         }
@@ -118,12 +120,5 @@ mod tests {
         let r_cmd = cmd1 + cmd2;
 
         assert_eq!(r_cmd.to_bytes(), vec![0b001_10001, 0b1100100, 0])
-
-        /*let action1 = Motor::Speed(100);
-        let action2 = Motor::Forward;
-    
-        let _ = action1 + action2;    
-
-       assert_eq!(action1.as_bytes(), [0b0010_1000, 0b1100100, 0])*/
     }
 }
