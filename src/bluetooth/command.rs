@@ -1,8 +1,12 @@
-// probablemente cambie esto
-
+/// Implementation of the command system, which is what the `Xplorer` interprets
+use super::ToBytes;
 use std::ops::Add;
-// pub use actions::*;
 
+/// Represents a command for the `Xplorer`
+/// 
+/// The ideal way to create this type is using the modules:
+/// 1. [`car`] -> commands for motor control
+/// 2. [`arm`] -> commands for robotic arm control
 pub struct Command {
     cmd: u8,
     action: u8,
@@ -46,10 +50,6 @@ impl From<&[u8]> for Command {
     }
 }
 
-pub trait ToBytes {
-    fn to_bytes(&self) -> Vec<u8>;
-}
-
 impl ToBytes for Command {
     fn to_bytes(&self) -> Vec<u8> {
         let mut vec = Vec::new();
@@ -59,14 +59,6 @@ impl ToBytes for Command {
             vec.push(value);
         }
 
-        vec.push(0);
-        vec
-    }
-}
-
-impl ToBytes for String {
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut vec: Vec<_> = self.bytes().collect();
         vec.push(0);
         vec
     }
@@ -106,6 +98,14 @@ create_command!(
     rightward => 1 << 2;
     leftward => 1 << 3;
     speed => 1 << 4, value;
+);
+
+create_command!(
+    arm => 1 << 0;
+    base => 1 << 0, grades;
+    elbow => 1 << 1, grades;
+    rest => 1 << 2, grades;
+    grip => 1 << 3, grades;
 );
 
 #[cfg(test)]
