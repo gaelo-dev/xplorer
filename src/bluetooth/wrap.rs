@@ -1,4 +1,4 @@
-/// Wrap the crate btleplug for more comfortable use
+/// Wrap the crate btleplug
 use super::{ToBytes, BlueError, Result};
 
 use btleplug::api::{Central as _, Characteristic, Manager as _, Peripheral as _, PeripheralProperties, ScanFilter, ValueNotification, WriteType};

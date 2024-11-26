@@ -22,9 +22,26 @@ mod wrap;
 mod command;
 
 use result::{Result, BlueError};
-use wrap::{Central, Peripherals, Xplorer};
-pub use command::{Command, ToBytes, car};
+pub use wrap::{Central, Peripherals, Xplorer};
+pub use command::{Command, car, arm};
 pub use btleplug::api::BDAddr;
+
+/// Try to start the bluetooth connection. Return a [`ConnectionState`]
+/// 
+/// **Parameters**
+/// 
+/// peripheral_id -> If an IP is passed, the connection with peripheral will be attempted
+pub async fn start(peripheral_ip: Option<BDAddr>) -> Result<ConnectionState> {
+    let central = Central::new().await.unwrap();
+    let peripherals = central.scan().await?;
+
+    let state = ConnectionState::Disconnected { central, peripherals };
+
+    match peripheral_ip {
+        Some(ip) => Ok(state.reconnect(ip).await?),
+        None => Ok(state)
+    }
+}
 
 /// Represents the connection state of the Bluetooth communication
 #[derive(Debug, Clone)]
@@ -60,19 +77,16 @@ impl ConnectionState {
     }
 }
 
-/// Try to start the bluetooth connection. Return a [`ConnectionState`]
-/// 
-/// **Parameters**
-/// 
-/// peripheral_id -> If an IP is passed, the connection with peripheral will be attempted
-pub async fn start(peripheral_ip: Option<BDAddr>) -> Result<ConnectionState> {
-    let central = Central::new().await.unwrap();
-    let peripherals = central.scan().await?;
+/// A trait to convert a type to a [`Vec<u8>`] (bytes array), necessary for sending messages to devices
+pub trait ToBytes {
+    fn to_bytes(&self) -> Vec<u8>;
+}
 
-    let state = ConnectionState::Disconnected { central, peripherals };
-
-    match peripheral_ip {
-        Some(ip) => Ok(state.reconnect(ip).await?),
-        None => Ok(state)
+/// General implementation for a String
+impl ToBytes for String {
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut vec: Vec<_> = self.bytes().collect();
+        vec.push(0);
+        vec
     }
 }
