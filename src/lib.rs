@@ -2,34 +2,37 @@ pub mod bluetooth;
 pub mod config;
 pub mod screens;
 
-// use bluetooth::ConnectionState;
-use screens::{Screen, Message as ScreenMessage};
+use bluetooth::ConnectionState;
+use screens::{Screen, connected, disconnected};
 use config::Config;
 
 use confy::ConfyError;
-use iced::{
-    // widget::{button, column, row, text, text_input}, 
-    Element, Task
-};
+use iced::{Element, Task};
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Screen(ScreenMessage),
     ChangedScreen(Screen),
+    ChangedState(ConnectionState),
+    Connected(connected::Message),
+    Disconnected(disconnected::Message),
+    Loading,
 }
 
 pub struct App {
-    // msg: String,
-    
     cfg: Config,
     screen: Screen,
-
-    // state: ConnectionState,
+    state: ConnectionState,
 }
 
 impl App {
     pub fn new() -> Result<Self, ConfyError> {
-        Ok(Self { cfg: Config::load()?, screen: Screen::loading() })
+        let state = ConnectionState::Loading;
+        
+        Ok(Self { 
+            cfg: Config::load()?, 
+            screen: Screen::create(&state),
+            state,
+        })
     }
 
     pub fn run(self) -> Result<(), iced::Error> {
@@ -39,8 +42,8 @@ impl App {
            .run_with(move || {
                 (
                     self,
-                    iced::Task::perform(bluetooth::start(ip), |state| {
-                        Message::ChangedScreen(state.unwrap().into())
+                    Task::perform(bluetooth::start(ip), |state| {
+                        Message::ChangedState(state.unwrap())
                     })
                 )
            })?;
@@ -50,20 +53,55 @@ impl App {
 
     fn update(&mut self, msg: Message) -> Task<Message> {
         match msg {
-            Message::Screen(msg) => {
-                let action = self.screen.update(msg);
-
-                // execute action ...
-                todo!()
-            },
             Message::ChangedScreen(screen) => {
                 self.screen = screen;
                 Task::none()
             },
+            Message::ChangedState(state) => {
+                self.state = state;
+
+                let screen = Screen::create(&self.state);
+                Task::done(Message::ChangedScreen(screen))
+            },
+            Message::Connected(msg) => {
+                if let Screen::Connected(screen) = &mut self.screen {
+                    let action = screen.update(msg);
+                    // ...
+                    
+                    todo!()
+                } else {
+                    Task::none()
+                }
+            },
+            Message::Disconnected(msg) => {
+                if let Screen::Disconnected(screen) = &mut self.screen {
+                    let action = screen.update(msg);
+                    
+                    match action {
+                        disconnected::Action::Connect(addr) => {
+                            self.cfg.addr = Some(addr);
+                            let state = self.state.clone();
+
+                            Task::done(Message::ChangedState(ConnectionState::Loading))
+                                .chain(Task::perform(
+                                    state.reconnect(addr),
+                                    |state| Message::ChangedState(state.unwrap())
+                                ))                      
+                        },
+                    }
+                } else {
+                    Task::none()
+                }
+            },
+            Message::Loading => Task::none(),
         }
     }
 
     fn view(&self) -> Element<Message> {
-        self.screen.view().map(Message::Screen)
+        match &self.screen {
+            Screen::Connected(screen) => screen.view().map(Message::Connected),
+            Screen::Disconnected(screen) => screen.view().map(Message::Disconnected),
+            Screen::Loading(screen) => screen.view()
+        }
     }
 }

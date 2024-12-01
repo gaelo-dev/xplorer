@@ -1,5 +1,5 @@
 // to do!
-use crate::bluetooth;
+// use crate::bluetooth;
 use iced::{Element, Task, widget};
 
 pub enum Action {
@@ -13,10 +13,7 @@ pub enum Message {
 }
 
 #[derive(Debug, Clone)]
-pub struct Connected {
-    pub central: bluetooth::Central,
-    pub xplorer: bluetooth::Xplorer,
-}
+pub struct Connected;
 
 impl Connected {
     pub fn update(&mut self, _msg: Message) -> Action {
@@ -24,7 +21,7 @@ impl Connected {
     }
 
     pub fn view(&self) -> Element<Message> {
-        widget::text("...").into()
+        widget::text("conectado").into()
     }
 }
 
