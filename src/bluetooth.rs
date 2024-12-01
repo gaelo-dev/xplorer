@@ -1,5 +1,5 @@
 mod result {
-    pub(super) type Result<T> = std::result::Result<T, BlueError>;
+    pub type Result<T> = std::result::Result<T, BlueError>;
     use thiserror::Error;
 
     #[derive(Error, Debug)]
@@ -21,7 +21,7 @@ mod result {
 mod wrap;
 mod command;
 
-use result::{Result, BlueError};
+pub use result::{Result, BlueError};
 pub use wrap::{Central, Peripherals, Xplorer};
 pub use command::{Command, car, arm};
 pub use btleplug::api::BDAddr;
@@ -32,7 +32,7 @@ pub use btleplug::api::BDAddr;
 /// 
 /// peripheral_id -> If an IP is passed, the connection with peripheral will be attempted
 pub async fn start(peripheral_ip: Option<BDAddr>) -> Result<ConnectionState> {
-    let central = Central::new().await.unwrap();
+    let central = Central::new().await?;
     let peripherals = central.scan().await?;
 
     let state = ConnectionState::Disconnected { central, peripherals };
