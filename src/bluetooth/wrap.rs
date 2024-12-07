@@ -1,10 +1,10 @@
 /// Wrap the crate btleplug
 use super::{ToBytes, BlueError, Result};
 
+use std::{time::Duration, pin::Pin, task};
 use btleplug::api::{Central as _, Characteristic, Manager as _, Peripheral as _, PeripheralProperties, ScanFilter, ValueNotification, WriteType};
 use btleplug::platform::{Adapter, Manager, Peripheral, PeripheralId};
-use std::{time::Duration, pin::Pin};
-use iced::futures::Stream;
+use iced::futures::{Stream, StreamExt, stream::FusedStream};
 use tokio::time;
 use uuid::Uuid;
 
@@ -35,10 +35,10 @@ pub struct Central {
 }
 
 impl Central {
+    /// Constructs an instance [`Central`] 
     pub async fn new() -> Result<Self> {
         let manager = Manager::new().await?;
-        // let adapter = get_adapter(manager).await?;
-        
+
         Ok(Self { 
             adapter: get_adapter(manager).await?, 
             filter: SERVICE_UUID
@@ -46,6 +46,8 @@ impl Central {
     }
 
     /// Starts a scan for BLE devices. This scan filters out most devices.
+    /// 
+    /// Returns the [Peripherals] that are discovered in 15 seconds
     pub async fn scan(&self) -> Result<Peripherals> {
         let filter = ScanFilter { services: vec![self.filter] }; 
         self.adapter.start_scan(filter).await?;
@@ -54,6 +56,7 @@ impl Central {
         self.peripherals().await
     }
 
+    /// Returns the [Peripherals] that have been discovered so far 
     pub async fn peripherals(&self) -> Result<Peripherals> {
         let peripherals = self.adapter.peripherals().await?;
         if peripherals.is_empty() {
@@ -94,18 +97,19 @@ pub struct Xplorer {
 }
 
 impl Xplorer {
-    /// Create an instance of the Bluetooth communication with the explorer
+    /// Constructs an instance of the Bluetooth communication with the explorer
     /// 
     /// Use [`Central::connect`]
     fn new(peripheral: Peripheral) -> Self {
         let id = peripheral.id();
 
         Self { 
+            id, 
             peripheral,
-            id 
         }
     }
 
+    /// Returns true if it is connected 
     pub async fn is_connected(&self) -> bool {
         match self.peripheral.is_connected().await {
             Ok(is_connected) => is_connected,
@@ -113,6 +117,7 @@ impl Xplorer {
         }
     }
 
+    /// Returns the properties associated with the [Xplorer] device
     pub async fn properties(&self) -> PeripheralProperties {
         self.peripheral.properties().await.unwrap().unwrap()
     }
@@ -139,7 +144,7 @@ impl Xplorer {
     pub async fn connect(&self) -> Result<()> {
         self.peripheral.connect().await?;
         self.peripheral.discover_services().await?;
-        // self.subscribe().await?;
+        self.subscribe().await?;
 
         Ok(())
     }
@@ -165,7 +170,43 @@ impl Xplorer {
             .await?)
     }
 
-    pub async fn recv_notifications(&self) -> Result<Pin<Box<dyn Stream<Item = ValueNotification> + Send>>> {
-        Ok(self.peripheral.notifications().await?)
+    /// Returns a stream of [Notifications]
+    pub async fn notifications(&self) -> Result<Notifications> {
+        Ok(Notifications { 
+            stream: self.peripheral.notifications().await?, 
+            terminated: false 
+        })
+    }
+}
+
+/// A wrapper for a stream of notifications that implements [`FusedStream`]
+pub struct Notifications {
+    stream: Pin<Box<dyn Stream<Item = ValueNotification> + Send>>,
+    terminated: bool,
+}
+
+impl Stream for Notifications {
+    type Item = ValueNotification;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+
+        if this.terminated {
+            task::Poll::Ready(None)
+        } else {
+            match this.stream.poll_next_unpin(cx) {
+                task::Poll::Ready(None) => {
+                    this.terminated = true;
+                    task::Poll::Ready(None)
+                }
+                other => other,
+            }
+        }
+    }
+}
+
+impl FusedStream for Notifications {
+    fn is_terminated(&self) -> bool {
+        self.terminated
     }
 }
