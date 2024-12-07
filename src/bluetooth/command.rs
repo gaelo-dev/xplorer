@@ -7,6 +7,7 @@ use std::ops::Add;
 /// The ideal way to create this type is using the modules:
 /// 1. [`car`] -> commands for motor control
 /// 2. [`arm`] -> commands for robotic arm control
+#[derive(Debug, Clone, Copy)]
 pub struct Command {
     cmd: u8,
     action: u8,
@@ -27,8 +28,8 @@ impl Add for Command {
     }
 }
 
-impl From<&[u8]> for Command {
-    fn from(value: &[u8]) -> Self {
+impl From<Vec<u8>> for Command {
+    fn from(value: Vec<u8>) -> Self {
         let mut iter = value.iter();
 
         let byte = *iter.next().unwrap();
