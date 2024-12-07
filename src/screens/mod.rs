@@ -14,8 +14,6 @@ pub mod loading {
 pub mod connected;
 pub mod disconnected;
 
-use crate::bluetooth::ConnectionState;
-
 macro_rules! screen {
     ( $( $screen:ident => $module:ident ,)* ) => {
         #[derive(Debug, Clone)]
@@ -40,15 +38,3 @@ screen!(
     Disconnected => disconnected,
     Loading => loading,
 );
-
-impl Screen {
-    pub fn create(state: &ConnectionState) -> Self {
-        match state {
-            ConnectionState::Connected { central, xplorer } => connected::Connected.into(),
-            ConnectionState::Disconnected { peripherals, .. } => {
-                disconnected::Disconnected::new(peripherals.clone()).into()
-            },
-            ConnectionState::Loading => loading::Loading.into(),
-        }
-    }
-}
