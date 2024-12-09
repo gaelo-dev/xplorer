@@ -5,13 +5,12 @@ pub mod subscription;
 
 use screens::{connected, disconnected, loading, Screen};
 use config::Config;
-use subscription::{Event, Input};
+use subscription::Event;
 
-use std::sync::Arc;
 use confy::ConfyError;
 use iced::{
-    futures::{channel::mpsc, SinkExt, lock::Mutex}, 
-    Element, Subscription, Task
+    futures::SinkExt, 
+    Element, Subscription, Task,
 };
 
 #[derive(Debug, Clone)]
@@ -26,7 +25,6 @@ pub enum Message {
 pub struct App {
     cfg: Config,
     screen: Screen,
-    sender: Option<Arc<Mutex<mpsc::Sender<Input>>>>,
 }
 
 impl App {
@@ -34,7 +32,6 @@ impl App {
         Ok(Self { 
             cfg: Config::load()?, 
             screen: loading::Loading.into(),
-            sender: None,
         })
     }
 
@@ -58,26 +55,37 @@ impl App {
         match msg {
             Message::BluetoothEvent(event) => {
                 match event {
-                    Event::Connected => {
-                        let screen = connected::Connected::new().into();
+                    Event::Connected { addr, sender } => {
+                        self.cfg.addr = Some(addr);
+
+                        let screen = connected::Connected::new(sender).into();
                         Task::done(Message::ChangedScreen(screen))
                     },
-                    Event::CommandReceived(cmd) => {
+                    Event::CommandReceived(_cmd) => {
                         todo!()
                     },
-                    Event::Disconnected { peripherals } => {
-                        let screen = disconnected::Disconnected::new(peripherals).into();
-                        Task::done(Message::ChangedScreen(screen))
+                    Event::Disconnected { peripherals, mut sender } => {
+                        match &self.cfg.addr {
+                            Some(addr) => {
+                                let ip = addr.clone();
+                                
+                                Task::perform(
+                                    async move {
+                                        let _ = sender.send(ip).await;
+                                    },
+                                    |_| Message::Ok,
+                                )
+                            },
+                            None => {
+                                let screen = disconnected::Disconnected::new(peripherals, sender).into();
+                                Task::done(Message::ChangedScreen(screen))
+                            },
+                        }
                     },
                     Event::Err(err) => {
                         eprint!("{err}");
                         Task::none()
                     },
-                    Event::Ready(sender) => {
-                        self.sender = Some(Arc::new(Mutex::new(sender)));
-                        Task::none()
-                    }
-
                 }
             }
             Message::ChangedScreen(screen) => {
@@ -86,10 +94,10 @@ impl App {
             },
             Message::Connected(msg) => {
                 if let Screen::Connected(screen) = &mut self.screen {
-                    let action = screen.update(msg);
+                    let _ = screen.update(msg);
                     // ...
                     
-                    todo!()
+                    Task::none()
                 } else {
                     Task::none()
                 }
@@ -99,18 +107,11 @@ impl App {
                     let action = screen.update(msg);
 
                     match action {
-                        disconnected::Action::Connect(addr) => {
-                            self.cfg.addr = Some(addr);
-                            let sender = Arc::clone(&self.sender.as_ref().unwrap()); 
-                            
-                            Task::perform(
-                                async move {
-                                    let mut sender = sender.lock().await;
-                                    let _ = sender.send(Input::Connect(addr)).await;
-                                },
-                                |_| Message::Ok,
-                            )
-                        },
+                        disconnected::Action::Run(task) => task.map(Message::Disconnected),
+                        disconnected::Action::Loading => {
+                            let screen = loading::Loading.into();
+                            Task::done(Message::ChangedScreen(screen))
+                        }
                     }
                 } else {
                     Task::none()
@@ -129,6 +130,12 @@ impl App {
     }
 
     fn subscribe(&self) -> Subscription<Message> {
-        Subscription::run(subscription::connection).map(Message::BluetoothEvent)
+        Subscription::batch([
+            Subscription::run(subscription::connection).map(Message::BluetoothEvent),
+            match &self.screen {
+                Screen::Connected(screen) => screen.subscription().map(Message::Connected),
+                _ => Subscription::none(),
+            }
+        ])
     }
 }
