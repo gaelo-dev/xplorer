@@ -1,13 +1,14 @@
 /// Implementation of the command system, which is what the `Xplorer` interprets
-use super::ToBytes;
 use std::ops::Add;
+
+use super::ToBytes;
 
 /// Represents a command for the `Xplorer`
 /// 
 /// The ideal way to create this type is using the modules:
 /// 1. [`car`] -> commands for motor control
 /// 2. [`arm`] -> commands for robotic arm control
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Command {
     cmd: u8,
     action: u8,
@@ -25,6 +26,24 @@ impl Add for Command {
             action: self.action | rhs.action,
             value: rhs.value.or(self.value)
         }
+    }
+}
+
+impl PartialEq for Command {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmd == other.cmd && self.action == other.action
+    }
+}
+
+impl PartialEq<u8> for Command {
+    fn eq(&self, other: &u8) -> bool {
+        self.cmd == *other || self.action == *other
+    }
+}
+
+impl PartialEq<Command> for u8 {
+    fn eq(&self, other: &Command) -> bool {
+        other.eq(self)
     }
 }
 
@@ -65,16 +84,19 @@ impl ToBytes for Command {
     }
 }
 
+/// A macro that creates a module with functions to create commands for a specific control like `car`
 macro_rules! create_command {
     ( $name:ident => $cmd:expr; $( $action:ident => $code:expr $(,$value:ident)? ;)* ) => {
         pub mod $name {
             use super::{Command};
             
+            pub const CMD: u8 = $cmd;
+
             $(
                 pub fn $action( $($value: u8)? ) -> Command {
                     $( 
                         return Command {
-                            cmd: $cmd,
+                            cmd: CMD,
                             action: $code,
                             value: Some($value)
                         };
@@ -82,7 +104,7 @@ macro_rules! create_command {
 
                     #[allow(unreachable_code)]
                     Command {
-                        cmd: $cmd,
+                        cmd: CMD,
                         action: $code,
                         value: None
                     }
@@ -102,7 +124,7 @@ create_command!(
 );
 
 create_command!(
-    arm => 1 << 0;
+    arm => 1 << 1;
     base => 1 << 0, grades;
     elbow => 1 << 1, grades;
     rest => 1 << 2, grades;
@@ -115,11 +137,28 @@ mod tests {
 
     #[test]
     fn to_bytes() {
-        let cmd1 = car::forward();
-        let cmd2 = car::speed(100);
+        let a = car::forward();
+        let b = car::speed(100);
 
-        let r_cmd = cmd1 + cmd2;
+        let c = a + b;
 
-        assert_eq!(r_cmd.to_bytes(), vec![0b001_10001, 0b1100100, 0])
+        assert_eq!(c.to_bytes(), vec![0b001_10001, 0b1100100, 0])
+    }
+
+    #[test]
+    fn assertions() {
+        let a = car::speed(100);
+        let b = car::CMD;
+        let c = car::speed(200);
+
+        // transitivity 
+        assert_eq!(a, b); assert_eq!(b, c); assert_eq!(a, c);
+
+        assert_eq!(car::forward(), car::forward()); // they are the same
+        assert_eq!(car::speed(100), car::speed(200)); // values ​​are not compared
+        assert_ne!(car::forward(), arm::base(90)); // the commands are not the same
+        assert_ne!(arm::base(80), arm::elbow(80)); // the actions are not the same
+        assert_eq!(car::forward(), car::CMD); // the command matches
+        assert_eq!(arm::elbow(80), 1 << 1); // the action matches
     }
 }
