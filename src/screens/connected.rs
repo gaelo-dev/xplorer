@@ -1,12 +1,13 @@
 // to do!
-// use crate::bluetooth;
+use std::sync::Arc;
+
 use iced::{
-    futures::{channel::mpsc, SinkExt}, 
+    futures::{channel::mpsc, SinkExt, lock::Mutex}, 
     keyboard, widget, 
     Element, Subscription, Task 
 };
 
-use crate::bluetooth::Command;
+use crate::bluetooth::{Command, car};
 
 pub enum Action {
     Run(Task<Message>),
@@ -15,37 +16,48 @@ pub enum Action {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Forward,
-    Backward,
-    Rightward,
-    Leftward,
-    Stop
+    Command(Command),
+    Ok,
 }
 
 #[derive(Debug, Clone)]
 pub struct Connected {
-    // command: Command,
-    sender: mpsc::Sender<Command>
+    command: Command,
+    sender: Arc<Mutex<mpsc::Sender<Command>>>,
+    // speed: u8,
 }
 
 impl Connected {
-    pub fn new(sender: mpsc::Sender<Command>) -> Self {
+    pub fn new(tx: mpsc::Sender<Command>) -> Self {
         Self { 
-            // command: Command::none(),
-            sender,
+            command: Command::default(),
+            sender: Arc::new(Mutex::new(tx)),
+            // speed: 100,
         }
     }
 
     pub fn update(&mut self, msg: Message) -> Action {
         match msg {
-            Message::Forward => println!("avanzando"),
-            Message::Backward => println!("retrocediendo"),
-            Message::Leftward => println!("a la izquierda"),
-            Message::Rightward => println!("a la derecha"),
-            Message::Stop => println!("stop!"),
-        }
+            Message::Command(cmd) => {
+                if self.command != cmd {
+                    self.command = cmd;
+                    let sender = Arc::clone(&self.sender); 
 
-        Action::None
+                    Action::Run(
+                        Task::perform(
+                            async move {
+                                let mut sender = sender.lock().await;
+                                let _ = sender.send(cmd).await;
+                            },
+                            |_| Message::Ok,
+                        )
+                    )
+                } else {
+                    Action::None
+                }
+            },
+            Message::Ok => Action::None,
+        }
     }
 
     pub fn view(&self) -> Element<Message> {
@@ -54,22 +66,24 @@ impl Connected {
 
     pub fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
-            keyboard::on_key_press(|key, _modifiers| {
+            keyboard::on_key_press(|key, modifiers| {
                 match key.as_ref() {
-                    keyboard::Key::Character("w") => Some(Message::Forward),
-                    keyboard::Key::Character("s") => Some(Message::Backward),
-                    keyboard::Key::Character("a") => Some(Message::Leftward),
-                    keyboard::Key::Character("d") => Some(Message::Rightward),
+                    keyboard::Key::Character("w") => Some(car::forward()),
+                    keyboard::Key::Character("s") => Some(car::backward()),
+                    keyboard::Key::Character("a") => Some(car::leftward()),
+                    keyboard::Key::Character("d") => Some(car::leftward()),
                     _ => None,
                 }
+                .map(|cmd| if modifiers.shift() { cmd + car::speed(255) } else { cmd })
+                .map(Message::Command)
             }),
 
             keyboard::on_key_release(|key, _modifiers| {
                 match key.as_ref() {
-                    keyboard::Key::Character("w") | keyboard::Key::Character("s") | 
-                    keyboard::Key::Character("a") | keyboard::Key::Character("d") => Some(Message::Stop),
+                    keyboard::Key::Character("w" | "s" | "a" | "d") => Some(car::speed(0)),
                     _ => None,
                 }
+                .map(Message::Command)
             }),
         ])
     }

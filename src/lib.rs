@@ -1,7 +1,7 @@
 pub mod bluetooth;
 pub mod config;
-pub mod screens;
-pub mod subscription;
+mod screens;
+mod subscription;
 
 use screens::{connected, disconnected, loading, Screen};
 use config::Config;
@@ -14,7 +14,7 @@ use iced::{
 };
 
 #[derive(Debug, Clone)]
-pub enum Message {
+enum Message {
     BluetoothEvent(subscription::Event),
     ChangedScreen(Screen),
     Connected(connected::Message),
@@ -83,7 +83,7 @@ impl App {
                         }
                     },
                     Event::Err(err) => {
-                        eprint!("{err}");
+                        eprintln!("{err}");
                         Task::none()
                     },
                 }
@@ -94,10 +94,12 @@ impl App {
             },
             Message::Connected(msg) => {
                 if let Screen::Connected(screen) = &mut self.screen {
-                    let _ = screen.update(msg);
-                    // ...
+                    let action = screen.update(msg);
                     
-                    Task::none()
+                    match action {
+                        connected::Action::Run(task) => task.map(Message::Connected),
+                        connected::Action::None => Task::none(),
+                    }                    
                 } else {
                     Task::none()
                 }
@@ -108,7 +110,7 @@ impl App {
 
                     match action {
                         disconnected::Action::Run(task) => task.map(Message::Disconnected),
-                        disconnected::Action::Loading => {
+                        disconnected::Action::Wait => {
                             let screen = loading::Loading.into();
                             Task::done(Message::ChangedScreen(screen))
                         }
@@ -131,9 +133,10 @@ impl App {
 
     fn subscribe(&self) -> Subscription<Message> {
         Subscription::batch([
-            Subscription::run(subscription::connection).map(Message::BluetoothEvent),
+            Subscription::run(subscription::bluetooth_connection).map(Message::BluetoothEvent),
             match &self.screen {
                 Screen::Connected(screen) => screen.subscription().map(Message::Connected),
+                Screen::Disconnected(screen) => screen.subscription().map(Message::Disconnected),
                 _ => Subscription::none(),
             }
         ])

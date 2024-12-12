@@ -11,7 +11,7 @@ use iced::{
 
 pub enum Action {
     Run(Task<Message>),
-    Loading,
+    Wait,
 }
 
 #[derive(Debug, Clone)]
@@ -49,7 +49,7 @@ impl Disconnected {
                     )
                 )
             },
-            Message::Wait => Action::Loading,
+            Message::Wait => Action::Wait,
         }
     } 
 
