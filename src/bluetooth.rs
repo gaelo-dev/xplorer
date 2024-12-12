@@ -26,6 +26,16 @@ pub use wrap::{Central, Peripherals, Xplorer};
 pub use command::{Command, car, arm};
 pub use btleplug::api::BDAddr;
 
+use btleplug::{platform::PeripheralId, api::PeripheralProperties};
+
+/// Search in the list of provided peripherals for the peripheral that matches the bluetooth address
+pub fn search(peripherals: &Peripherals, addr: BDAddr) -> Result<&(PeripheralId, PeripheralProperties)> {
+    peripherals
+        .into_iter()
+        .find(|(_id, properties)| properties.address == addr)
+        .ok_or(BlueError::NotFoundPeripheral)
+}
+
 /// A trait to convert a type to a [`Vec<u8>`] (bytes array), necessary for sending messages to devices
 pub trait ToBytes {
     fn to_bytes(&self) -> Vec<u8>;
