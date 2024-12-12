@@ -37,7 +37,7 @@ impl PartialEq for Command {
 
 impl PartialEq<u8> for Command {
     fn eq(&self, other: &u8) -> bool {
-        self.cmd == *other || self.action == *other
+        self.cmd == *other
     }
 }
 
@@ -72,7 +72,7 @@ impl From<Vec<u8>> for Command {
 
 impl ToBytes for Command {
     fn to_bytes(&self) -> Vec<u8> {
-        let mut vec = Vec::new();
+        let mut vec = Vec::with_capacity(3);
         vec.push((self.cmd << 5) | self.action);
 
         if let Some(value) = self.value {
@@ -159,6 +159,5 @@ mod tests {
         assert_ne!(car::forward(), arm::base(90)); // the commands are not the same
         assert_ne!(arm::base(80), arm::elbow(80)); // the actions are not the same
         assert_eq!(car::forward(), car::CMD); // the command matches
-        assert_eq!(arm::elbow(80), 1 << 1); // the action matches
     }
 }
