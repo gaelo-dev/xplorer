@@ -36,6 +36,8 @@ impl App {
     }
 
     pub fn run(self) -> Result<(), iced::Error> {
+        log::info!("Running app with this config: {:?}", self.cfg);
+
         iced::application("Xplorer app", Self::update, Self::view)
            .subscription(Self::subscribe)
            .run_with(move || {
@@ -52,6 +54,8 @@ impl App {
     }
 
     fn update(&mut self, msg: Message) -> Task<Message> {
+        log::debug!("New message generated: {msg:#?}");
+        
         match msg {
             Message::BluetoothEvent(event) => {
                 match event {
@@ -67,11 +71,10 @@ impl App {
                     Event::Disconnected { peripherals, mut sender } => {
                         match &self.cfg.addr {
                             Some(addr) => {
-                                let ip = addr.clone();
-                                
+                                let addr = *addr;
                                 Task::perform(
                                     async move {
-                                        let _ = sender.send(ip).await;
+                                        let _ = sender.send(addr).await;
                                     },
                                     |_| Message::Ok,
                                 )
@@ -83,13 +86,15 @@ impl App {
                         }
                     },
                     Event::Err(err) => {
-                        eprintln!("{err}");
+                        log::error!("Bluetooth Error: {err}");
                         Task::none()
                     },
                 }
             }
             Message::ChangedScreen(screen) => {
+                log::debug!("New screen: {screen:#?}");
                 self.screen = screen;
+                
                 Task::none()
             },
             Message::Connected(msg) => {

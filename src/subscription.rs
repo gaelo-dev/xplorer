@@ -14,7 +14,7 @@ use iced::{
 /// including discovering peripherals, establishing connections, and handling communication.
 /// 
 /// ## Use 
-/// It is intended to be used as an [`iced::Subscription`]
+/// It's intended to be used as an [`iced::Subscription`]
 /// 
 /// ```no_run
 /// Subscription::run(bluetooth_connection);
@@ -26,33 +26,40 @@ pub fn bluetooth_connection() -> impl Stream<Item = Event> {
     stream::channel(100, |mut output| async move {
         let (sender, receiver) = mpsc::channel(100);
         
-        let central = bluetooth::Central::new().await.unwrap();
-        let peripherals = central.scan().await.unwrap();
+        let central = bluetooth::Central::new().await.expect("Error creating bluetooth client");
+        let peripherals = central.scan().await.expect("Error scanning peripherals");
 
         let _ = output.send(Event::Disconnected { peripherals: peripherals.clone(), sender }).await;
         let mut state = ConnectionState::Disconnected { peripherals, receiver };
 
+        log::info!("The first connection state: {state:#?}");
+
         loop {
             match &mut state {
                 ConnectionState::Connected { xplorer, receiver } => {
-                    let mut notifications = xplorer.notifications().await.unwrap();
+                    let mut notifications = xplorer.notifications().await.expect("Error get the notifications");
 
                     futures::select! {
                         cmd = receiver.select_next_some() => {
                             if let Err(err) = xplorer.send(cmd).await {
                                 let _= output.send(Event::Err(err.to_string())).await;
+                            } else {
+                                log::debug!("Command sent: {cmd:?}");
                             }
                         }
 
                         notification = notifications.select_next_some() => {
                             let cmd = Command::from(notification.value);
                             let _= output.send(Event::CommandReceived(cmd)).await;
+
+                            log::debug!("Command received: {cmd:?}");
                         }
                         
                     }
                 },
                 ConnectionState::Disconnected { peripherals, receiver } => {
                     let addr = receiver.select_next_some().await;               
+                    log::info!("Trying connect to: {addr}");
 
                     let (id, _properties) = match bluetooth::search(peripherals, addr) {
                         Ok(value) => value,
@@ -75,6 +82,7 @@ pub fn bluetooth_connection() -> impl Stream<Item = Event> {
                     let _ = output.send(Event::Connected { addr, sender }).await;
                     state = ConnectionState::Connected { xplorer, receiver };
                     
+                    log::info!("The connection state changed to: {state:#?}");
                 },
             }
         }
