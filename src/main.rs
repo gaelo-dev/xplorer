@@ -6,11 +6,12 @@ use log::LevelFilter;
 fn main() -> Result<(), Box<dyn Error>> {
     let log_level = env::var("LOG").map_or(0, |s| s.parse().unwrap());
     setup_logger(log_level)?;   
-    
+
     let app = App::new()?;
-   
+
     if let Err(err) = app.run() {
-        eprintln!("{err}");
+        log::error!("Error running app: {err}");
+        return Err(Box::new(err));
     }
 
     Ok(())
@@ -41,7 +42,7 @@ fn setup_logger(level: u64) -> Result<(), fern::InitError> {
                 .level_for("xplorer", LevelFilter::Trace),
         _ => dispatch.level(log::LevelFilter::Trace),
     };
-    
+
     dispatch
         .chain(fern::log_file("program.log")?)
         .chain(std::io::stdout())

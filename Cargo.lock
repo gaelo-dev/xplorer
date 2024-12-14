@@ -4339,7 +4339,7 @@ checksum = "af4e2e2f7cba5a093896c1e150fbfe177d1883e7448200efb81d40b9d339ef26"
 
 [[package]]
 name = "xplorer"
-version = "0.3.0"
+version = "1.1.0"
 dependencies = [
  "btleplug",
  "confy",
