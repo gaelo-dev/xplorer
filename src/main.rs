@@ -17,7 +17,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn setup_logger(level: u64) -> Result<(), fern::InitError> {    
-    let mut dispatch = fern::Dispatch::new();
+    let mut dispatch = fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}] {} ({}): {}",
+                humantime::format_rfc3339_seconds(SystemTime::now()),
+                record.level(),
+                record.target(),
+                message
+            ))
+        });
 
     dispatch = match level {
         0 => dispatch.level(LevelFilter::Warn),
@@ -32,22 +41,10 @@ fn setup_logger(level: u64) -> Result<(), fern::InitError> {
                 .level_for("xplorer", LevelFilter::Trace),
         _ => dispatch.level(log::LevelFilter::Trace),
     };
-
-    let format = fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "[{}] {} ({}): {}",
-                humantime::format_rfc3339_seconds(SystemTime::now()),
-                record.level(),
-                record.target(),
-                message
-            ))
-        })
-        .chain(fern::log_file("program.log")?)
-        .chain(std::io::stdout());
-
+    
     dispatch
-        .chain(format)
+        .chain(fern::log_file("program.log")?)
+        .chain(std::io::stdout())
         .apply()?; 
 
     Ok(())
