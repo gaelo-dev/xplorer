@@ -1,6 +1,6 @@
 [package]
 name = "xplorer"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 
 [dependencies]
@@ -8,10 +8,15 @@ edition = "2021"
 btleplug = { version = "0.11.6", features = ["serde"] }
 tokio = { version = "1.42.0", features = ["time"] }
 # futures = "0.3.31"
-thiserror = "2.0.5"
+thiserror = "2.0.7"
 uuid = "1.11.0"
 
 # GUI
 iced = { version = "0.13.1", features = ["tokio"] }
 confy = "0.6.1"
-serde = "1.0.215"
+serde = "1.0.216"
+
+# Log 
+log = "0.4.22"
+fern = "0.7.0"
+humantime = "2.1.0"
