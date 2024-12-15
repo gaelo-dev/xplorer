@@ -15,7 +15,7 @@ use iced::{
 
 #[derive(Debug, Clone)]
 enum Message {
-    BluetoothEvent(subscription::Event),
+    BluetoothEvent(subscription::EventResult),
     ChangedScreen(Screen),
     Connected(connected::Message),
     Disconnected(disconnected::Message),
@@ -43,32 +43,29 @@ impl App {
            .run_with(move || {
                 (
                     self,
-                    // Task::perform(bluetooth::start(ip), |state| {
-                    //     Message::ChangedState(state.unwrap())
-                    //})
                     Task::none()
                 )
            })?;
-    
+
         Ok(())
     }
 
     fn update(&mut self, msg: Message) -> Task<Message> {
         log::debug!("New message generated: {msg:#?}");
-        
+
         match msg {
-            Message::BluetoothEvent(event) => {
+            Message::BluetoothEvent(event) => {                
                 match event {
-                    Event::Connected { addr, sender } => {
+                    Ok(Event::Connected { addr, sender }) => {
                         self.cfg.addr = Some(addr);
 
                         let screen = connected::Connected::new(sender).into();
                         Task::done(Message::ChangedScreen(screen))
                     },
-                    Event::CommandReceived(_cmd) => {
+                    Ok(Event::CommandReceived(_cmd)) => {
                         todo!()
                     },
-                    Event::Disconnected { peripherals, mut sender } => {
+                    Ok(Event::Disconnected { peripherals, mut sender }) => {
                         match &self.cfg.addr {
                             Some(addr) => {
                                 let addr = *addr;
@@ -85,43 +82,43 @@ impl App {
                             },
                         }
                     },
-                    Event::Err(err) => {
-                        log::error!("Bluetooth Error: {err}");
-                        Task::none()
+                    Err(err) => {
+                        log::error!("Bluetooth Error -> {err}");
+                        return Task::none();
                     },
                 }
             }
             Message::ChangedScreen(screen) => {
                 log::debug!("New screen: {screen:#?}");
                 self.screen = screen;
-                
+
                 Task::none()
             },
             Message::Connected(msg) => {
-                if let Screen::Connected(screen) = &mut self.screen {
-                    let action = screen.update(msg);
-                    
-                    match action {
-                        connected::Action::Run(task) => task.map(Message::Connected),
-                        connected::Action::None => Task::none(),
-                    }                    
-                } else {
-                    Task::none()
-                }
+                let Screen::Connected(screen) = &mut self.screen else {
+                    return Task::none();
+                };
+
+                let action = screen.update(msg);
+
+                match action {
+                    connected::Action::Run(task) => task.map(Message::Connected),
+                    connected::Action::None => Task::none(),
+                }                    
             },
             Message::Disconnected(msg) => {
-                if let Screen::Disconnected(screen) = &mut self.screen {
-                    let action = screen.update(msg);
+                let Screen::Disconnected(screen) = &mut self.screen else {
+                    return Task::none();
+                };
 
-                    match action {
-                        disconnected::Action::Run(task) => task.map(Message::Disconnected),
-                        disconnected::Action::Wait => {
-                            let screen = loading::Loading.into();
-                            Task::done(Message::ChangedScreen(screen))
-                        }
+                let action = screen.update(msg);
+
+                match action {
+                    disconnected::Action::Run(task) => task.map(Message::Disconnected),
+                    disconnected::Action::Wait => {
+                        let screen = loading::Loading.into();
+                        Task::done(Message::ChangedScreen(screen))
                     }
-                } else {
-                    Task::none()
                 }
             },
             Message::Ok => Task::none(),
