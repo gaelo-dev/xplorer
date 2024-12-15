@@ -2,7 +2,7 @@ mod result {
     pub type Result<T> = std::result::Result<T, BlueError>;
     use thiserror::Error;
 
-    #[derive(Error, Debug)]
+    #[derive(Error, Debug, Clone)]
     pub enum BlueError {
         #[error("Unable to find adapters.")]
         NotFoundAdapters,
@@ -13,8 +13,17 @@ mod result {
         #[error("I'm a teapot: the device refuses to make coffee because it is a teapot")]
         Error418,
         
-        #[error("Error: {0}")]
-        Other(#[from] btleplug::Error),
+        #[error("{0}")]
+        Other(String),
+    }
+
+    impl From<btleplug::Error> for BlueError {
+        fn from(value: btleplug::Error) -> Self {
+            match value {
+                btleplug::Error::Other(err) => Self::Other(format!("{err:?}")),
+                _ => Self::Other(value.to_string()),
+            }
+        }
     }
 }
 
