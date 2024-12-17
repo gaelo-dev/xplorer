@@ -7,7 +7,6 @@ edition = "2021"
 # Bluetooth
 btleplug = { version = "0.11.6", features = ["serde"] }
 tokio = { version = "1.42.0", features = ["time"] }
-# futures = "0.3.31"
 thiserror = "2.0.7"
 uuid = "1.11.0"
 
@@ -18,5 +17,5 @@ serde = "1.0.216"
 
 # Log 
 log = "0.4.22"
-fern = "0.7.0"
+fern = "0.7.1"
 humantime = "2.1.0"
