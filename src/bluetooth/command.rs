@@ -53,8 +53,8 @@ impl From<Vec<u8>> for Command {
 
         let byte = *iter.next().unwrap();
         let mut s = Self { 
-            cmd: byte >> 5, 
-            action: byte & 0b000_11111, 
+            cmd: byte >> 6, 
+            action: byte & 0b00_111111, 
             value: None,
         };
 
@@ -73,7 +73,7 @@ impl From<Vec<u8>> for Command {
 impl ToBytes for Command {
     fn to_bytes(&self) -> Vec<u8> {
         let mut vec = Vec::with_capacity(3);
-        vec.push((self.cmd << 5) | self.action);
+        vec.push((self.cmd << 6) | self.action);
 
         if let Some(value) = self.value {
             vec.push(value);
@@ -115,7 +115,7 @@ macro_rules! create_command {
 }
 
 create_command!(
-    car => 1 << 0;
+    car => 1;
     forward => 1 << 0;
     backward => 1 << 1;
     rightward => 1 << 2;
@@ -124,7 +124,7 @@ create_command!(
 );
 
 create_command!(
-    arm => 1 << 1;
+    arm => 2;
     base => 1 << 0, grades;
     elbow => 1 << 1, grades;
     rest => 1 << 2, grades;
@@ -142,7 +142,7 @@ mod tests {
 
         let c = a + b;
 
-        assert_eq!(c.to_bytes(), vec![0b001_10001, 0b1100100, 0])
+        assert_eq!(c.to_bytes(), vec![0b01_010001, 0b1100100, 0])
     }
 
     #[test]
