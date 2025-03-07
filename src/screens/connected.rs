@@ -3,11 +3,12 @@ use std::sync::Arc;
 
 use iced::{
     futures::{channel::mpsc, SinkExt, lock::Mutex}, 
-    keyboard, widget, 
+    widget::{column, row, vertical_rule, slider, text},
+    keyboard, 
     Element, Subscription, Task 
 };
 
-use crate::bluetooth::{Command, car};
+use crate::bluetooth::{arm, car, Command};
 
 pub enum Action {
     Run(Task<Message>),
@@ -17,6 +18,9 @@ pub enum Action {
 #[derive(Debug, Clone)]
 pub enum Message {
     Command(Command),
+    CommandReceived(Command), 
+    SliderChanged((usize, u8)),
+    SliderCommand(usize),
     Ok,
 }
 
@@ -24,7 +28,8 @@ pub enum Message {
 pub struct Connected {
     command: Command,
     sender: Arc<Mutex<mpsc::Sender<Command>>>,
-    // speed: u8,
+    sliders: Vec<Slider>,
+    sensors: Vec<Sensor>,
 }
 
 impl Connected {
@@ -32,7 +37,19 @@ impl Connected {
         Self { 
             command: Command::default(),
             sender: Arc::new(Mutex::new(tx)),
-            // speed: 100,
+            sliders: vec![
+                // Car
+                Slider { name: "Speed", cmd: car::speed(100), range: 0..=255 },
+
+                // Arm
+                Slider { name: "Base", cmd: arm::base(90), range: 0..=180 }, Slider { name: "Elbow", cmd: arm::elbow(90), range: 0..=180 },
+                Slider { name: "Rest", cmd: arm::rest(90), range: 0..=180 }, Slider { name: "Shoulder", cmd: arm::shoulder(90), range: 0..=180 },
+                Slider { name: "Doll", cmd: arm::doll(90), range: 0..=180 }, Slider { name: "Grip", cmd: arm::grip(90), range: 0..=180 },
+            ],
+            sensors: vec![
+                Sensor { id: 1 << 0,name: "Distancia", value: 0 }, Sensor { id: 1 << 1, name: "Temperatura", value: 0 }, 
+                Sensor { id: 1 << 2, name: "Humedad", value: 0 }, Sensor { id: 1 << 3, name: "Gas", value: 0 }
+            ],
         }
     }
 
@@ -56,22 +73,55 @@ impl Connected {
                     Action::None
                 }
             },
+            Message::CommandReceived(cmd) => {
+                if let Some(value) = cmd.value {
+                    let sensor = self.sensors.iter_mut().find(|sensor| cmd.action == sensor.id).unwrap();
+                    sensor.value = value;
+
+                }
+                
+                Action::None
+            },
+            Message::SliderChanged((num, value)) => {
+                let cmd = &mut self.sliders[num].cmd;
+                cmd.value = Some(value);
+
+                Action::None
+            },
+            Message::SliderCommand(num) => Action::Run(Task::done(Message::Command((&self.sliders[num].cmd).clone()))),
             Message::Ok => Action::None,
         }
     }
 
     pub fn view(&self) -> Element<Message> {
-        widget::text("conectado").into()
+        let sliders = self.sliders.iter().enumerate().map(|(n, slr)| {
+            column![
+                text(slr.name),
+                slider(slr.range.clone(), slr.cmd.value.unwrap(), move |v| Message::SliderChanged((n, v))).on_release(Message::SliderCommand(n))
+            ].into()
+        });
+
+        let sensors = self.sensors.iter().map(|sensor| text(format!("{}: {}", sensor.name, sensor.value)).into());
+
+        row![
+            column(sliders),
+            vertical_rule(5),
+            column(sensors)
+        ].into()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
             keyboard::on_key_press(|key, modifiers| {
                 match key.as_ref() {
+                    // Car -> WASD
                     keyboard::Key::Character("w") => Some(car::forward()),
                     keyboard::Key::Character("s") => Some(car::backward()),
                     keyboard::Key::Character("a") => Some(car::leftward()),
                     keyboard::Key::Character("d") => Some(car::leftward()),
+                    
+                    // Arm 
+                    // ...
                     _ => None,
                 }
                 .map(|cmd| if modifiers.shift() { cmd + car::speed(255) } else { cmd })
@@ -89,4 +139,16 @@ impl Connected {
     }
 }
 
-// ...
+#[derive(Debug, Clone)]
+struct Slider {
+    name: &'static str,
+    cmd: Command,
+    range: std::ops::RangeInclusive<u8>,
+}
+
+#[derive(Debug, Clone)]
+struct Sensor {
+    id: u8,
+    name: &'static str,
+    value: u8,
+}
