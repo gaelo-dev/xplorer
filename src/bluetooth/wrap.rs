@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 pub type Peripherals = Vec<(PeripheralId, PeripheralProperties)>;
 
-const SERVICE_UUID: Uuid = uuid::uuid!("0000FFE0-0000-1000-8000-00805F9B34FB");
-const CHARACTERISTIC_UUID: Uuid = uuid::uuid!("0000FFE1-0000-1000-8000-00805F9B34FB");
+const SERVICE_UUID: Uuid = uuid::uuid!("0000ffe0-0000-1000-8000-00805f9b34fb");
+const CHARACTERISTIC_UUID: Uuid = uuid::uuid!("0000ffe1-0000-1000-8000-00805f9b34fb");
 
 async fn get_adapter(manager: Manager) -> Result<Adapter> {
     let central = manager
@@ -79,10 +79,8 @@ impl Central {
     /// Create an instance of the device and make the connection.
     pub async fn connect(&self, id: &PeripheralId) -> Result<Xplorer> {
         let xplorer = Xplorer::new(self.adapter.peripheral(id).await?);
-        if !xplorer.is_connected().await {
-            xplorer.connect().await?;
-        }
-        
+        xplorer.connect().await?;
+
         Ok(xplorer)
     }
 }
@@ -144,6 +142,8 @@ impl Xplorer {
     pub async fn connect(&self) -> Result<()> {
         self.peripheral.connect().await?;
         self.peripheral.discover_services().await?;
+        time::sleep(Duration::from_secs(15)).await;
+
         self.subscribe().await?;
 
         Ok(())
@@ -208,5 +208,13 @@ impl Stream for Notifications {
 impl FusedStream for Notifications {
     fn is_terminated(&self) -> bool {
         self.terminated
+    }
+}
+
+impl std::fmt::Debug for Notifications {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Notifications")
+            .field("terminated", &self.terminated)
+            .finish()
     }
 }
