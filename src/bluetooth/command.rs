@@ -11,8 +11,8 @@ use super::ToBytes;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Command {
     cmd: u8,
-    action: u8,
-    value: Option<u8>,
+    pub action: u8,
+    pub value: Option<u8>,
 }
 
 impl Add for Command {
@@ -128,7 +128,9 @@ create_command!(
     base => 1 << 0, grades;
     elbow => 1 << 1, grades;
     rest => 1 << 2, grades;
-    grip => 1 << 3, grades;
+    shoulder => 1 << 3, grades;
+    doll => 1 << 4, grades;
+    grip => 1 << 5, grades;
 );
 
 #[cfg(test)]
