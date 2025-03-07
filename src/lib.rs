@@ -57,14 +57,12 @@ impl App {
             Message::BluetoothEvent(event) => {                
                 match event {
                     Ok(Event::Connected { addr, sender }) => {
-                        self.cfg.addr = Some(addr);
-
                         let screen = connected::Connected::new(sender).into();
+                        self.cfg.addr = Some(addr);
+                        
                         Task::done(Message::ChangedScreen(screen))
                     },
-                    Ok(Event::CommandReceived(_cmd)) => {
-                        todo!()
-                    },
+                    Ok(Event::CommandReceived(cmd)) => Task::done(Message::Connected(connected::Message::CommandReceived(cmd))),
                     Ok(Event::Disconnected { peripherals, mut sender }) => {
                         match &self.cfg.addr {
                             Some(addr) => {
