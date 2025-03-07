@@ -31,7 +31,7 @@ mod wrap;
 mod command;
 
 pub use result::{Result, BlueError};
-pub use wrap::{Central, Peripherals, Xplorer};
+pub use wrap::{Central, Peripherals, Xplorer, Notifications};
 pub use command::{Command, car, arm};
 pub use btleplug::api::BDAddr;
 
