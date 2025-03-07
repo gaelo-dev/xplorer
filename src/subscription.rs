@@ -37,9 +37,7 @@ pub fn bluetooth_connection() -> impl Stream<Item = EventResult> {
 
         loop {
             match &mut state {
-                ConnectionState::Connected { xplorer, receiver } => {
-                    let mut notifications = xplorer.notifications().await?;
-
+                ConnectionState::Connected { xplorer, receiver, notifications } => {
                     futures::select! {
                         cmd = receiver.select_next_some() => {
                             xplorer.send(cmd).await?;
@@ -62,9 +60,10 @@ pub fn bluetooth_connection() -> impl Stream<Item = EventResult> {
                     let xplorer = central.connect(id).await?;
 
                     let (sender, receiver) = mpsc::channel(100);
+                    let notifications = xplorer.notifications().await?;
 
                     let _ = output.send(Event::Connected { addr, sender }).await;
-                    state = ConnectionState::Connected { xplorer, receiver };
+                    state = ConnectionState::Connected { xplorer, receiver, notifications };
 
                     log::info!("The connection state changed to -> {state:#?}");
                 },
@@ -106,6 +105,7 @@ enum ConnectionState {
     Connected {
         xplorer: bluetooth::Xplorer,
         receiver: mpsc::Receiver<Command>,
+        notifications: bluetooth::Notifications,
     },
 
     /// Represents the disconnected state and contains a list of peripherals to which it can connect.
