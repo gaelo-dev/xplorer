@@ -32,7 +32,7 @@ mod command;
 
 pub use result::{Result, BlueError};
 pub use wrap::{Central, Peripherals, Xplorer, Notifications};
-pub use command::{Command, car, arm};
+pub use command::{Command, car, arm, sensors};
 pub use btleplug::api::BDAddr;
 
 use btleplug::{platform::PeripheralId, api::PeripheralProperties};

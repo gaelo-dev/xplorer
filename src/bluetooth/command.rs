@@ -133,6 +133,14 @@ create_command!(
     grip => 1 << 5, grades;
 );
 
+create_command!(
+    sensors => 2;
+    humidity => 1 << 0, value;
+    temperature => 1 << 1, value;
+    gas => 1 << 2, value;
+    distance => 1 << 3, value;
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
