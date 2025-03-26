@@ -90,7 +90,7 @@ private:
 
 public:
   void attach(int pinBase, int pinElbow, int pinRest, int pinShoulder, int pinDoll, int pinGrip) {
-    base.attach(pin); elbow.attach(pinElbow); rest.attach(pinRest)
+    base.attach(pinBase); elbow.attach(pinElbow); rest.attach(pinRest);
     shoulder.attach(pinShoulder); doll.attach(pinDoll); grip.attach(pinGrip);
   }
 
