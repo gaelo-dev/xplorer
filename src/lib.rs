@@ -63,21 +63,13 @@ impl App {
                         Task::done(Message::ChangedScreen(screen))
                     },
                     Ok(Event::CommandReceived(cmd)) => Task::done(Message::Connected(connected::Message::CommandReceived(cmd))),
-                    Ok(Event::Disconnected { peripherals, mut sender }) => {
+                    Ok(Event::Disconnected { peripherals, sender }) => {
+                        let screen = disconnected::Disconnected::new(peripherals, sender).into();
+                        let task = Task::done(Message::ChangedScreen(screen));
+                        
                         match &self.cfg.addr {
-                            Some(addr) => {
-                                let addr = *addr;
-                                Task::perform(
-                                    async move {
-                                        let _ = sender.send(addr).await;
-                                    },
-                                    |_| Message::Ok,
-                                )
-                            },
-                            None => {
-                                let screen = disconnected::Disconnected::new(peripherals, sender).into();
-                                Task::done(Message::ChangedScreen(screen))
-                            },
+                            Some(addr) => task.chain(Task::done(Message::Disconnected(disconnected::Message::Connect(*addr)))),
+                            None => task,
                         }
                     },
                     Err(err) => {
